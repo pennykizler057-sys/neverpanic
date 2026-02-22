@@ -5,163 +5,140 @@ export type Result<T = unknown, E = unknown> =
     }
   | { success: false; error: E };
 
-const ok = <const T>(data: T): Result<T, never> => ({
-  success: true,
-  data,
-});
-
-const err = <const T>(error: T): Result<never, T> => ({
-  success: false,
-  error,
-});
-
 /**
- * Create a safe function from an unsafe one.
+ * Create a neverpanic instance with strictly typed Error and Data constraints.
  *
- * @param cb - The async function to wrap.
- * @param [eh] - Optional fallback error handler.
- * @returns A new function that returns a typesafe Result.
+ * @returns A neverpanic instance with all functions constrained to the specified types.
  *
  * @example
- * const getUser = n.safeFn(
- *   async (id: string) => {
- *     const res = await fetch(`https://example.com/users/${id}`);
- *     if (!res.ok) return { success: false, error: "FAILED_TO_FETCH" };
+ * type MyData = { id: string; name: string };
+ * type MyError = "NOT_FOUND" | "UNAUTHORIZED" | "SERVER_ERROR";
  *
- *     return { success: true, data: await res.json() };
- *   },
- *   () => "FAILED_TO_GET_USER"
- * );
+ * const myN = createNeverpanic<MyData, MyError>();
  *
- * const getUserResult = await getUser("some-user-id");
- * if (!getUserResult.success) {
- *   console.error(getUserResult.error);
- * } else {
- *   console.log(getUserResult.data);
- * }
+ * // Now myN.ok only accepts MyData
+ * const result = myN.ok({ id: "123", name: "John" });
+ *
+ * // And myN.err only accepts MyError
+ * const error = myN.err("NOT_FOUND");
  */
-function safeFn<
-  T extends Result | Promise<Result>,
-  A extends unknown[],
-  E = null,
->(
-  cb: (...args: A) => T,
-  eh: (e: unknown) => E,
-): (...args: A) => T | { success: false; error: E } {
-  const createErrorResult = (e: unknown) =>
-    ({
-      success: false,
-      error: eh(e),
-    }) as const;
-
-  return (...args) => {
-    try {
-      const result = cb(...args);
-
-      if (result instanceof Promise)
-        return result.catch(createErrorResult) as T;
-
-      return result;
-    } catch (e) {
-      return createErrorResult(e) as T;
-    }
-  };
-}
-
-/**
- * Run an unsafe function, handle any errors and return a Result.
- *
- * @param cb - The async function to call.
- * @param [eh] - Optional fallback error handler.
- * @returns The awaited return value of cb.
- *
- * @example
- * const user = await n.fromUnsafe(() => db.findUser('some-user-id'), () => 'FAILED_T0_FIND_USER')
- * if (!user.success) {
- * 	console.error(user.error)
- * } else {
- * 	console.log(user.data)
- * }
- */
-function fromUnsafe<
-  T,
-  E = null,
-  R = T extends Promise<unknown>
-    ? Promise<Result<Awaited<T>, E>>
-    : Result<T, E>,
->(cb: () => T, eh: (err: unknown) => E): R {
-  const createErrorResult = (e: unknown) => ({
-    success: false,
-    error: eh(e),
+export function createNeverpanic<
+  D = unknown,
+  E = unknown,
+>() {
+  const ok = <const T extends D>(
+    data: T,
+  ): Result<T, never> => ({
+    success: true,
+    data,
   });
 
-  const createSuccessResult = (data: T) =>
-    ({
-      success: true,
-      data,
-    }) as const;
+  const err = <const T extends E>(
+    error: T,
+  ): Result<never, T> => ({
+    success: false,
+    error,
+  });
 
-  try {
-    const result = cb();
+  function safeFn<
+    T extends Result<D, E> | Promise<Result<D, E>>,
+    A extends unknown[],
+    EH extends E = E,
+  >(
+    cb: (...args: A) => T,
+    eh: (e: unknown) => EH,
+  ): (...args: A) => T | { success: false; error: EH } {
+    const createErrorResult = (e: unknown) =>
+      ({
+        success: false,
+        error: eh(e),
+      }) as const;
 
-    if (result instanceof Promise)
-      return result
-        .then(createSuccessResult)
-        .catch(createErrorResult) as R;
+    return (...args) => {
+      try {
+        const result = cb(...args);
 
-    return createSuccessResult(result) as R;
-  } catch (e) {
-    return createErrorResult(e) as R;
-  }
-}
+        if (result instanceof Promise)
+          return result.catch(createErrorResult) as T;
 
-/**
- * Convert a list of results into a single result.
- *
- * @param results - A list of Results.
- * @returns A single result containing the data / errors of the input results.
- *
- * @example
- * const findUserResults = userIds.map((userId) =>
- *   n.fromUnsafe(
- *     () => db.findUser(userId),
- *     () => "FAILED_TO_FIND_USER" as const,
- *   ),
- * );
- *
- * const result = n.resultsToResult(findUserResults)
- */
-const resultsToResult = <
-  T extends Result[],
-  D extends Extract<T[number], { success: true }>,
-  E extends Extract<T[number], { success: false }>,
->(
-  results: T,
-): Result<D[], E[]> => {
-  const errors = results.filter(
-    (result): result is E => !result.success,
-  );
-
-  if (errors.length)
-    return {
-      success: false,
-      error: errors,
+        return result;
+      } catch (e) {
+        return createErrorResult(e) as {
+          success: false;
+          error: EH;
+        };
+      }
     };
+  }
 
-  const successes = results.filter(
-    (result): result is D => result.success,
-  );
+  function fromUnsafe<
+    T,
+    EH extends E = E,
+    R = T extends Promise<infer U>
+      ? Promise<Result<U extends D ? U : never, EH>>
+      : T extends D
+        ? Result<T, EH>
+        : never,
+  >(cb: () => T, eh: (err: unknown) => EH): R {
+    const createErrorResult = (e: unknown) => ({
+      success: false,
+      error: eh(e),
+    });
+
+    const createSuccessResult = (data: T) =>
+      ({
+        success: true,
+        data,
+      }) as const;
+
+    try {
+      const result = cb();
+
+      if (result instanceof Promise)
+        return result
+          .then(createSuccessResult)
+          .catch(createErrorResult) as R;
+
+      return createSuccessResult(result) as R;
+    } catch (e) {
+      return createErrorResult(e) as R;
+    }
+  }
+
+  const resultsToResult = <
+    T extends Result<D, E>[],
+    TD extends Extract<T[number], { success: true }>,
+    TE extends Extract<T[number], { success: false }>,
+  >(
+    results: T,
+  ): Result<TD[], TE[]> => {
+    const errors = results.filter(
+      (result): result is TE => !result.success,
+    );
+
+    if (errors.length)
+      return {
+        success: false,
+        error: errors,
+      };
+
+    const successes = results.filter(
+      (result): result is TD => result.success,
+    );
+
+    return {
+      success: true,
+      data: successes,
+    };
+  };
 
   return {
-    success: true,
-    data: successes,
+    ok,
+    err,
+    safeFn,
+    fromUnsafe,
+    resultsToResult,
   };
-};
+}
 
-export const n = {
-  ok,
-  err,
-  safeFn,
-  fromUnsafe,
-  resultsToResult,
-};
+export const n = createNeverpanic();
