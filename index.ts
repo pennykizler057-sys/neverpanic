@@ -23,73 +23,47 @@ export const createNeverpanic = <
     error,
   });
 
-  const safeFn = <
-    T extends Result<D, E> | Promise<Result<D, E>>,
-    A extends unknown[],
-    EH extends E = E,
-  >(
-    cb: (...args: A) => T,
-    eh: (e: unknown) => EH,
-  ): ((
-    ...args: A
-  ) => T | { success: false; error: EH }) => {
-    const createErrorResult = (e: unknown) =>
-      ({
-        success: false,
-        error: eh(e),
-      }) as const;
-
-    return (...args) => {
+  const safeFn =
+    <
+      T extends Result<D, E> | Promise<Result<D, E>>,
+      A extends unknown[],
+      EH extends Result<D, E>,
+    >(
+      cb: (...args: A) => T,
+      eh: (e: unknown) => EH,
+    ): ((...args: A) => T | EH) =>
+    (...args) => {
       try {
         const result = cb(...args);
 
         if (result instanceof Promise)
-          return result.catch(createErrorResult) as T;
+          return result.catch(eh) as T;
 
         return result;
       } catch (e) {
-        return createErrorResult(e) as {
-          success: false;
-          error: EH;
-        };
+        return eh(e);
       }
     };
-  };
 
   const fromUnsafe = <
-    T,
-    EH extends E = E,
+    T extends D | Promise<D>,
+    EH extends Result<D, E>,
     R = T extends Promise<infer U>
-      ? Promise<Result<U extends D ? U : never, EH>>
-      : T extends D
-        ? Result<T, EH>
-        : never,
+      ? Promise<{ success: true; data: U }>
+      : { success: true; data: T },
   >(
     cb: () => T,
     eh: (err: unknown) => EH,
-  ): R => {
-    const createErrorResult = (e: unknown) => ({
-      success: false,
-      error: eh(e),
-    });
-
-    const createSuccessResult = (data: T) =>
-      ({
-        success: true,
-        data,
-      }) as const;
-
+  ): R | EH => {
     try {
       const result = cb();
 
       if (result instanceof Promise)
-        return result
-          .then(createSuccessResult)
-          .catch(createErrorResult) as R;
+        return result.then(ok).catch(eh) as R;
 
-      return createSuccessResult(result) as R;
+      return ok(result as D) as R;
     } catch (e) {
-      return createErrorResult(e) as R;
+      return eh(e);
     }
   };
 

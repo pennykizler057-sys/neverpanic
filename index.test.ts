@@ -13,7 +13,7 @@ describe("safeFn", () => {
       async () => {
         throw new Error("Unexpected error.");
       },
-      (originalError) => originalError,
+      (originalError) => n.err(originalError),
     );
 
     const result = await safeFunction();
@@ -29,7 +29,7 @@ describe("safeFn", () => {
       async () => {
         throw new Error("Unexpected error.");
       },
-      () => expectedErrorMessage,
+      () => n.err(expectedErrorMessage),
     );
 
     const result = await safeFunction();
@@ -48,7 +48,7 @@ describe("safeFn", () => {
       async () => {
         return { success: true, data: expectedData };
       },
-      (originalError) => originalError,
+      (originalError) => n.err(originalError),
     );
 
     const result = await safeFunction();
@@ -67,7 +67,7 @@ describe("safeFn", () => {
       async () => {
         return { success: false, error: expectedError };
       },
-      (originalError) => originalError,
+      (originalError) => n.err(originalError),
     );
 
     const result = await safeFunction();
@@ -86,7 +86,7 @@ describe("safeFn", () => {
       async (name: string) => {
         return { success: true, data: name };
       },
-      (originalError) => originalError,
+      (originalError) => n.err(originalError),
     );
 
     const result = await safeFunction(expectedName);
@@ -104,7 +104,7 @@ describe("fromUnsafe", () => {
     const expectedReturn = "some result";
     const result = n.fromUnsafe(
       () => expectedReturn,
-      (originalError) => originalError,
+      (originalError) => n.err(originalError),
     );
 
     if (!result.success)
@@ -120,7 +120,7 @@ describe("fromUnsafe", () => {
         if (true as boolean)
           throw new Error("Some synchronous error");
       },
-      (originalError) => originalError,
+      (originalError) => n.err(originalError),
     );
 
     if (result.success)
@@ -134,7 +134,7 @@ describe("fromUnsafe", () => {
       async () => {
         throw new Error("Some synchronous error");
       },
-      (originalError) => originalError,
+      (originalError) => n.err(originalError),
     );
 
     if (result.success)
@@ -151,7 +151,10 @@ describe("fromUnsafe", () => {
       async () => {
         throw thrownError;
       },
-      (e) => (originalError = e),
+      (e) => {
+        originalError = e;
+        return n.err(originalError);
+      },
     );
 
     expect(originalError).toBe(thrownError);
@@ -164,7 +167,7 @@ describe("fromUnsafe", () => {
       async () => {
         throw new Error("Some synchronous error");
       },
-      () => expectedError,
+      (originalError) => n.err(expectedError),
     );
 
     if (result.success)
