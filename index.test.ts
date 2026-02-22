@@ -9,9 +9,12 @@ import { n, Result } from ".";
 
 describe("safeFn", () => {
   it("should catch any thrown errors and return success false", async () => {
-    const safeFunction = n.safeFn(async () => {
-      throw new Error("Unexpected error.");
-    });
+    const safeFunction = n.safeFn(
+      async () => {
+        throw new Error("Unexpected error.");
+      },
+      (originalError) => originalError,
+    );
 
     const result = await safeFunction();
 
@@ -41,9 +44,12 @@ describe("safeFn", () => {
   it("should return the success result of the callback if it doesn't throw", async () => {
     const expectedData = "some data" as const;
 
-    const safeFunction = n.safeFn(async () => {
-      return { success: true, data: expectedData };
-    });
+    const safeFunction = n.safeFn(
+      async () => {
+        return { success: true, data: expectedData };
+      },
+      (originalError) => originalError,
+    );
 
     const result = await safeFunction();
 
@@ -57,9 +63,12 @@ describe("safeFn", () => {
   it("should return the error result of the callback if it doesn't throw", async () => {
     const expectedError = "some-error" as const;
 
-    const safeFunction = n.safeFn(async () => {
-      return { success: false, error: expectedError };
-    });
+    const safeFunction = n.safeFn(
+      async () => {
+        return { success: false, error: expectedError };
+      },
+      (originalError) => originalError,
+    );
 
     const result = await safeFunction();
 
@@ -73,9 +82,12 @@ describe("safeFn", () => {
   it("should pass arguments to the callback", async () => {
     const expectedName = "Bob";
 
-    const safeFunction = n.safeFn(async (name: string) => {
-      return { success: true, data: name };
-    });
+    const safeFunction = n.safeFn(
+      async (name: string) => {
+        return { success: true, data: name };
+      },
+      (originalError) => originalError,
+    );
 
     const result = await safeFunction(expectedName);
 
@@ -88,9 +100,12 @@ describe("safeFn", () => {
 });
 
 describe("fromUnsafe", () => {
-  it("should return the value from the callback", async () => {
+  it("should return the value from the callback", () => {
     const expectedReturn = "some result";
-    const result = await n.fromUnsafe(() => expectedReturn);
+    const result = n.fromUnsafe(
+      () => expectedReturn,
+      (originalError) => originalError,
+    );
 
     if (!result.success)
       throw new Error("Result should be success.");
@@ -100,10 +115,13 @@ describe("fromUnsafe", () => {
   });
 
   it("should handle synchronous errors", async () => {
-    const result = n.fromUnsafe(() => {
-      if (true as boolean)
-        throw new Error("Some synchronous error");
-    });
+    const result = n.fromUnsafe(
+      () => {
+        if (true as boolean)
+          throw new Error("Some synchronous error");
+      },
+      (originalError) => originalError,
+    );
 
     if (result.success)
       throw new Error("Result should not be success.");
@@ -112,9 +130,12 @@ describe("fromUnsafe", () => {
   });
 
   it("should handle asynchronous errors", async () => {
-    const result = await n.fromUnsafe(async () => {
-      throw new Error("Some synchronous error");
-    });
+    const result = await n.fromUnsafe(
+      async () => {
+        throw new Error("Some synchronous error");
+      },
+      (originalError) => originalError,
+    );
 
     if (result.success)
       throw new Error("Result should not be success.");

@@ -5,27 +5,10 @@ export type Result<T = unknown, E = unknown> =
     }
   | { success: false; error: E };
 
-/**
- * Create a neverpanic instance with strictly typed Error and Data constraints.
- *
- * @returns A neverpanic instance with all functions constrained to the specified types.
- *
- * @example
- * type MyData = { id: string; name: string };
- * type MyError = "NOT_FOUND" | "UNAUTHORIZED" | "SERVER_ERROR";
- *
- * const myN = createNeverpanic<MyData, MyError>();
- *
- * // Now myN.ok only accepts MyData
- * const result = myN.ok({ id: "123", name: "John" });
- *
- * // And myN.err only accepts MyError
- * const error = myN.err("NOT_FOUND");
- */
-export function createNeverpanic<
+export const createNeverpanic = <
   D = unknown,
   E = unknown,
->() {
+>() => {
   const ok = <const T extends D>(
     data: T,
   ): Result<T, never> => ({
@@ -40,14 +23,16 @@ export function createNeverpanic<
     error,
   });
 
-  function safeFn<
+  const safeFn = <
     T extends Result<D, E> | Promise<Result<D, E>>,
     A extends unknown[],
     EH extends E = E,
   >(
     cb: (...args: A) => T,
     eh: (e: unknown) => EH,
-  ): (...args: A) => T | { success: false; error: EH } {
+  ): ((
+    ...args: A
+  ) => T | { success: false; error: EH }) => {
     const createErrorResult = (e: unknown) =>
       ({
         success: false,
@@ -69,9 +54,9 @@ export function createNeverpanic<
         };
       }
     };
-  }
+  };
 
-  function fromUnsafe<
+  const fromUnsafe = <
     T,
     EH extends E = E,
     R = T extends Promise<infer U>
@@ -79,7 +64,10 @@ export function createNeverpanic<
       : T extends D
         ? Result<T, EH>
         : never,
-  >(cb: () => T, eh: (err: unknown) => EH): R {
+  >(
+    cb: () => T,
+    eh: (err: unknown) => EH,
+  ): R => {
     const createErrorResult = (e: unknown) => ({
       success: false,
       error: eh(e),
@@ -103,7 +91,7 @@ export function createNeverpanic<
     } catch (e) {
       return createErrorResult(e) as R;
     }
-  }
+  };
 
   const resultsToResult = <
     T extends Result<D, E>[],
@@ -139,6 +127,6 @@ export function createNeverpanic<
     fromUnsafe,
     resultsToResult,
   };
-}
+};
 
 export const n = createNeverpanic();
