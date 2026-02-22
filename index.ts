@@ -5,6 +5,29 @@ export type Result<T = unknown, E = unknown> =
     }
   | { success: false; error: E };
 
+/**
+ * Create a typesafe instance of neverpanic.
+ *
+ * @returns An instance of neverpanic that conforms to the types specified in the generic arguments.
+ *
+ * @example
+ * const getUser = n.safeFn(
+ *   async (id: string) => {
+ *     const res = await fetch(`https://example.com/users/${id}`);
+ *     if (!res.ok) return { success: false, error: "FAILED_TO_FETCH" };
+ *
+ *     return { success: true, data: await res.json() };
+ *   },
+ *   () => "FAILED_TO_GET_USER"
+ * );
+ *
+ * const getUserResult = await getUser("some-user-id");
+ * if (!getUserResult.success) {
+ *   console.error(getUserResult.error);
+ * } else {
+ *   console.log(getUserResult.data);
+ * }
+ */
 export const createNeverpanic = <
   D = unknown,
   E = unknown,
