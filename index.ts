@@ -34,15 +34,15 @@ export const createNeverpanic = <
 >() => {
   const ok = <const T extends D>(
     data: T,
-  ): Result<T, never> => ({
-    success: true,
+  ): { success: true; data: T } => ({
+    success: true as const,
     data,
   });
 
   const err = <const T extends E>(
     error: T,
-  ): Result<never, T> => ({
-    success: false,
+  ): { success: false; error: T } => ({
+    success: false as const,
     error,
   });
 
